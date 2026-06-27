@@ -886,7 +886,7 @@ const InternManagementPortal = () => {
           gap: '20px'
         }}>
           {filteredTasks.map(task => {
-            const intern = interns.find(i => i.id == task.intern_id);
+            const intern = interns.find(i => i.id === task.intern_id);
             const statusColors = {
               pending: colors.warning,
               in_progress: colors.primary,
