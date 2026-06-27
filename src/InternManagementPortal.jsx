@@ -402,10 +402,10 @@ const InternManagementPortal = () => {
       </h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '40px' }}>
-        <StatCard label="Total Interns" value={statistics.totalInterns} icon="👥" />
-        <StatCard label="Total Tasks" value={statistics.totalTasks} icon="📋" />
-        <StatCard label="Completed Tasks" value={statistics.completedTasks} icon="✓" />
-        <StatCard label="Pending Tasks" value={statistics.pendingTasks} icon="⏳" />
+        <StatCard label="Total Interns" value={statistics.totalInterns} icon="" />
+        <StatCard label="Total Tasks" value={statistics.totalTasks} icon="" />
+        <StatCard label="Completed Tasks" value={statistics.completedTasks} icon="" />
+        <StatCard label="Pending Tasks" value={statistics.pendingTasks} icon="" />
       </div>
 
       <div style={{
