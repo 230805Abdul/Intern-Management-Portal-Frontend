@@ -1,11 +1,11 @@
-// InternManagementPortal-JWT-Updated.jsx
-// Frontend with Complete JWT Authentication
+// InternManagementPortal-JWT-Fixed.jsx
+// Fixed: Login redirect + Removed demo credentials display
 
 import React, { useState, useEffect } from 'react';
 
 const InternManagementPortal = () => {
   // State Management
-  const [currentPage, setCurrentPage] = useState('login'); // login, dashboard, interns, tasks
+  const [currentPage, setCurrentPage] = useState('login');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [token, setToken] = useState(null);
@@ -67,27 +67,38 @@ const InternManagementPortal = () => {
   // API Base URL
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
+  console.log('API_BASE_URL:', API_BASE_URL);
+
   // ============================================================================
   // JWT Token Management
   // ============================================================================
 
   useEffect(() => {
+    console.log('Checking for existing token...');
     // Check if token exists in localStorage on mount
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
+    console.log('savedToken:', savedToken ? 'exists' : 'not found');
+    console.log('savedUser:', savedUser);
+
     if (savedToken && savedUser) {
+      console.log('Found existing token and user, setting state...');
       setToken(savedToken);
       setCurrentUser(JSON.parse(savedUser));
       setIsLoggedIn(true);
       setCurrentPage('dashboard');
       verifyToken(savedToken);
+    } else {
+      console.log('No saved token/user found, staying on login');
+      setCurrentPage('login');
     }
   }, []);
 
   // Verify token with backend
   const verifyToken = async (tkn) => {
     try {
+      console.log('Verifying token...');
       const response = await fetch(`${API_BASE_URL}/auth/verify`, {
         method: 'POST',
         headers: {
@@ -96,8 +107,10 @@ const InternManagementPortal = () => {
       });
 
       if (!response.ok) {
-        // Token is invalid
+        console.error('Token verification failed');
         handleLogout();
+      } else {
+        console.log('Token verified successfully');
       }
     } catch (error) {
       console.error('Error verifying token:', error);
@@ -105,13 +118,15 @@ const InternManagementPortal = () => {
   };
 
   // ============================================================================
-  // Login Handler
+  // Login Handler - FIXED
   // ============================================================================
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError('');
     setLoginLoading(true);
+
+    console.log('Login attempt with username:', loginUsername);
 
     if (!loginUsername || !loginPassword) {
       setLoginError('Please enter both username and password');
@@ -120,6 +135,8 @@ const InternManagementPortal = () => {
     }
 
     try {
+      console.log('Sending login request to:', `${API_BASE_URL}/auth/login`);
+      
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
@@ -131,32 +148,48 @@ const InternManagementPortal = () => {
         })
       });
 
-      const data = await response.json();
+      console.log('Login response status:', response.status);
 
-      if (data.success) {
-        // Save token and user info
+      const data = await response.json();
+      console.log('Login response:', data);
+
+      if (data.success && data.token) {
+        console.log('Login successful! Token:', data.token.substring(0, 20) + '...');
+        
+        // Save token and user info to localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
 
+        console.log('Saved to localStorage, updating state...');
+
+        // Update state
         setToken(data.token);
         setCurrentUser(data.user);
         setIsLoggedIn(true);
-        setCurrentPage('dashboard');
+
+        console.log('State updated, fetching initial data...');
+
+        // Fetch initial data
+        setTimeout(() => {
+          fetchStatistics(data.token);
+          fetchInterns(data.token);
+          fetchTasks(data.token);
+        }, 100);
 
         // Clear form
         setLoginUsername('');
         setLoginPassword('');
 
-        // Fetch initial data
-        fetchStatistics(data.token);
-        fetchInterns(data.token);
-        fetchTasks(data.token);
+        console.log('Setting current page to dashboard');
+        setCurrentPage('dashboard');
+
       } else {
+        console.error('Login failed:', data.message);
         setLoginError(data.message || 'Login failed');
       }
     } catch (error) {
       console.error('Login error:', error);
-      setLoginError('Error connecting to server. Please try again.');
+      setLoginError('Error connecting to server. Please check your backend URL.');
     } finally {
       setLoginLoading(false);
     }
@@ -167,6 +200,7 @@ const InternManagementPortal = () => {
   // ============================================================================
 
   const handleLogout = () => {
+    console.log('Logging out...');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setToken(null);
@@ -203,7 +237,6 @@ const InternManagementPortal = () => {
 
     if (!response.ok) {
       if (response.status === 401) {
-        // Token expired or invalid
         handleLogout();
         throw new Error('Session expired. Please login again.');
       }
@@ -219,6 +252,7 @@ const InternManagementPortal = () => {
 
   const fetchStatistics = async (tkn = token) => {
     try {
+      console.log('Fetching statistics with token...');
       const headers = {
         'Authorization': `Bearer ${tkn}`
       };
@@ -226,6 +260,7 @@ const InternManagementPortal = () => {
       const data = await response.json();
 
       if (data.success) {
+        console.log('Statistics fetched:', data.data);
         setStatistics(data.data);
       }
     } catch (error) {
@@ -239,8 +274,10 @@ const InternManagementPortal = () => {
 
   const fetchInterns = async (tkn = token) => {
     try {
+      console.log('Fetching interns...');
       const data = await fetchWithToken(`${API_BASE_URL}/interns`);
       if (data.success) {
+        console.log('Interns fetched:', data.data);
         setInterns(data.data);
         setFilteredInterns(data.data);
       }
@@ -325,8 +362,10 @@ const InternManagementPortal = () => {
 
   const fetchTasks = async (tkn = token) => {
     try {
+      console.log('Fetching tasks...');
       const data = await fetchWithToken(`${API_BASE_URL}/tasks`);
       if (data.success) {
+        console.log('Tasks fetched:', data.data);
         setTasks(data.data);
         setFilteredTasks(data.data);
       }
@@ -502,35 +541,7 @@ const InternManagementPortal = () => {
   );
 
   // ============================================================================
-  // Component: Button
-  // ============================================================================
-
-  const Button = ({ label, onClick, variant = 'primary', style = {}, disabled = false }) => (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      style={{
-        padding: '10px 20px',
-        borderRadius: '8px',
-        border: 'none',
-        fontSize: '14px',
-        fontWeight: '600',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        backgroundColor: variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : colors.success,
-        color: '#fff',
-        transition: 'all 0.3s ease',
-        opacity: disabled ? 0.6 : 1,
-        ...style
-      }}
-      onMouseEnter={(e) => !disabled && (e.target.style.opacity = '0.8')}
-      onMouseLeave={(e) => !disabled && (e.target.style.opacity = '1')}
-    >
-      {label}
-    </button>
-  );
-
-  // ============================================================================
-  // Render: Login Page
+  // Render: Login Page (WITHOUT DEMO CREDENTIALS)
   // ============================================================================
 
   const LoginPage = () => (
@@ -587,7 +598,7 @@ const InternManagementPortal = () => {
               type="text"
               value={loginUsername}
               onChange={(e) => setLoginUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="Enter your username"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -615,7 +626,7 @@ const InternManagementPortal = () => {
               type="password"
               value={loginPassword}
               onChange={(e) => setLoginPassword(e.target.value)}
-              placeholder="admin123"
+              placeholder="Enter your password"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -648,39 +659,6 @@ const InternManagementPortal = () => {
             {loginLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <div style={{
-          marginTop: '30px',
-          padding: '20px',
-          borderRadius: '8px',
-          backgroundColor: colors.background,
-          fontSize: '13px',
-          color: colors.textMuted,
-          lineHeight: '1.6'
-        }}>
-          <strong>Demo Credentials:</strong>
-          <br />
-          <br />
-          <strong>Admin:</strong>
-          <br />
-          Username: admin
-          <br />
-          Password: admin123
-          <br />
-          <br />
-          <strong>Manager:</strong>
-          <br />
-          Username: manager
-          <br />
-          Password: manager123
-          <br />
-          <br />
-          <strong>Intern:</strong>
-          <br />
-          Username: intern
-          <br />
-          Password: intern123
-        </div>
       </div>
     </div>
   );
@@ -1283,6 +1261,8 @@ const InternManagementPortal = () => {
   // Main Render
   // ============================================================================
 
+  console.log('Rendering, isLoggedIn:', isLoggedIn, 'currentPage:', currentPage);
+
   if (!isLoggedIn) {
     return <LoginPage />;
   }
@@ -1312,7 +1292,7 @@ const InternManagementPortal = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ fontSize: '14px', color: colors.textMuted }}>
-            Welcome, <strong>{currentUser?.name}</strong> ({currentUser?.role})
+            Welcome, <strong>{currentUser?.name}</strong>
           </div>
           <button
             onClick={handleLogout}
