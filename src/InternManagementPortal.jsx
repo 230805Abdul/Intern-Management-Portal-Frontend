@@ -1,811 +1,1068 @@
+// InternManagementPortal-JWT-Updated.jsx
+// Frontend with Complete JWT Authentication
+
 import React, { useState, useEffect } from 'react';
 
 const InternManagementPortal = () => {
-  // Color scheme - Dark mode with professional colors
-  const colors = {
-    primary: '#1e40af',
-    secondary: '#0f172a',
-    background: '#0f172a',
-    surface: '#1e293b',
-    border: '#334155',
-    text: '#f1f5f9',
-    textSecondary: '#cbd5e1',
-    success: '#10b981',
-    danger: '#ef4444',
-    warning: '#f59e0b',
-    hover: '#1e3a8a'
-  };
+  // State Management
+  const [currentPage, setCurrentPage] = useState('login'); // login, dashboard, interns, tasks
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [token, setToken] = useState(null);
 
-  // API Configuration
-  const API_BASE_URL = 'http://localhost:5000/api';
+  // Login Form State
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  // State management
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  // Interns State
   const [interns, setInterns] = useState([]);
+  const [filteredInterns, setFilteredInterns] = useState([]);
+  const [internSearchTerm, setInternSearchTerm] = useState('');
+  const [filterDepartment, setFilterDepartment] = useState('All');
+  const [newIntern, setNewIntern] = useState({
+    name: '',
+    email: '',
+    department: '',
+    joining_date: ''
+  });
+  const [editingIntern, setEditingIntern] = useState(null);
+  const [internError, setInternError] = useState('');
+
+  // Tasks State
   const [tasks, setTasks] = useState([]);
+  const [filteredTasks, setFilteredTasks] = useState([]);
+  const [taskSearchTerm, setTaskSearchTerm] = useState('');
+  const [filterTaskStatus, setFilterTaskStatus] = useState('All');
+  const [newTask, setNewTask] = useState({
+    intern_id: '',
+    title: '',
+    description: '',
+    status: 'pending'
+  });
+  const [editingTask, setEditingTask] = useState(null);
+  const [taskError, setTaskError] = useState('');
+
+  // Statistics State
   const [statistics, setStatistics] = useState({
     totalInterns: 0,
     totalTasks: 0,
     completedTasks: 0,
     pendingTasks: 0
   });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [showInternForm, setShowInternForm] = useState(false);
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [editingIntern, setEditingIntern] = useState(null);
-  const [editingTask, setEditingTask] = useState(null);
-  const [filterDepartment, setFilterDepartment] = useState('All');
-  const [filterTaskStatus, setFilterTaskStatus] = useState('All');
-  const [searchIntern, setSearchIntern] = useState('');
 
-  // Form state
-  const [internFormData, setInternFormData] = useState({
-    name: '',
-    email: '',
-    department: '',
-    joining_date: ''
-  });
+  // Colors
+  const colors = {
+    primary: '#1e40af',
+    danger: '#dc2626',
+    success: '#16a34a',
+    background: '#0f172a',
+    surface: '#1e293b',
+    border: '#334155',
+    text: '#f1f5f9',
+    textMuted: '#cbd5e1'
+  };
 
-  const [taskFormData, setTaskFormData] = useState({
-    intern_id: '',
-    title: '',
-    description: '',
-    status: 'pending'
-  });
+  // API Base URL
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
-  // Fetch data on component mount
+  // ============================================================================
+  // JWT Token Management
+  // ============================================================================
+
   useEffect(() => {
-    fetchInterns();
-    fetchTasks();
-    fetchStatistics();
+    // Check if token exists in localStorage on mount
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setCurrentUser(JSON.parse(savedUser));
+      setIsLoggedIn(true);
+      setCurrentPage('dashboard');
+      verifyToken(savedToken);
+    }
   }, []);
 
-  // API Calls
-  const fetchInterns = async () => {
+  // Verify token with backend
+  const verifyToken = async (tkn) => {
     try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/interns`);
-      if (!response.ok) throw new Error('Failed to fetch interns');
-      const data = await response.json();
-      setInterns(data.data || []);
-      setError('');
-    } catch (err) {
-      setError('Error fetching interns: ' + err.message);
-      console.error('Error fetching interns:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchTasks = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/tasks`);
-      if (!response.ok) throw new Error('Failed to fetch tasks');
-      const data = await response.json();
-      setTasks(data.data || []);
-    } catch (err) {
-      console.error('Error fetching tasks:', err);
-    }
-  };
-
-  const fetchStatistics = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/statistics`);
-      if (!response.ok) throw new Error('Failed to fetch statistics');
-      const data = await response.json();
-      setStatistics(data.data);
-    } catch (err) {
-      console.error('Error fetching statistics:', err);
-    }
-  };
-
-  // Validation functions
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validateInternForm = () => {
-    if (!internFormData.name.trim()) {
-      setError('Name is required');
-      return false;
-    }
-    if (!internFormData.email.trim()) {
-      setError('Email is required');
-      return false;
-    }
-    if (!validateEmail(internFormData.email)) {
-      setError('Please enter a valid email address');
-      return false;
-    }
-    if (!internFormData.department) {
-      setError('Department is required');
-      return false;
-    }
-    if (!internFormData.joining_date) {
-      setError('Joining date is required');
-      return false;
-    }
-    return true;
-  };
-
-  const validateTaskForm = () => {
-    if (!taskFormData.intern_id) {
-      setError('Please select an intern');
-      return false;
-    }
-    if (!taskFormData.title.trim()) {
-      setError('Task title is required');
-      return false;
-    }
-    if (!taskFormData.description.trim()) {
-      setError('Task description is required');
-      return false;
-    }
-    return true;
-  };
-
-  // Intern operations
-  const handleAddIntern = () => {
-    setEditingIntern(null);
-    setInternFormData({ name: '', email: '', department: '', joining_date: '' });
-    setShowInternForm(true);
-    setError('');
-  };
-
-  const handleEditIntern = (intern) => {
-    setEditingIntern(intern);
-    setInternFormData(intern);
-    setShowInternForm(true);
-    setError('');
-  };
-
-  const handleSaveIntern = async () => {
-    if (!validateInternForm()) return;
-
-    setLoading(true);
-    try {
-      const url = editingIntern
-        ? `${API_BASE_URL}/interns/${editingIntern.id}`
-        : `${API_BASE_URL}/interns`;
-
-      const method = editingIntern ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(`${API_BASE_URL}/auth/verify`, {
+        method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tkn}`
+        }
+      });
+
+      if (!response.ok) {
+        // Token is invalid
+        handleLogout();
+      }
+    } catch (error) {
+      console.error('Error verifying token:', error);
+    }
+  };
+
+  // ============================================================================
+  // Login Handler
+  // ============================================================================
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+
+    if (!loginUsername || !loginPassword) {
+      setLoginError('Please enter both username and password');
+      setLoginLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify(internFormData),
+        body: JSON.stringify({
+          username: loginUsername,
+          password: loginPassword
+        })
       });
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to save intern');
-      }
+      if (data.success) {
+        // Save token and user info
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
 
-      setShowInternForm(false);
-      setError('');
-      fetchInterns();
-      fetchStatistics();
-    } catch (err) {
-      setError(err.message);
-      console.error('Error saving intern:', err);
+        setToken(data.token);
+        setCurrentUser(data.user);
+        setIsLoggedIn(true);
+        setCurrentPage('dashboard');
+
+        // Clear form
+        setLoginUsername('');
+        setLoginPassword('');
+
+        // Fetch initial data
+        fetchStatistics(data.token);
+        fetchInterns(data.token);
+        fetchTasks(data.token);
+      } else {
+        setLoginError(data.message || 'Login failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      setLoginError('Error connecting to server. Please try again.');
     } finally {
-      setLoading(false);
+      setLoginLoading(false);
+    }
+  };
+
+  // ============================================================================
+  // Logout Handler
+  // ============================================================================
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setCurrentPage('login');
+    setInterns([]);
+    setTasks([]);
+    setStatistics({
+      totalInterns: 0,
+      totalTasks: 0,
+      completedTasks: 0,
+      pendingTasks: 0
+    });
+  };
+
+  // ============================================================================
+  // API Fetch Helper with Token
+  // ============================================================================
+
+  const fetchWithToken = async (url, options = {}) => {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      ...options.headers
+    };
+
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        // Token expired or invalid
+        handleLogout();
+        throw new Error('Session expired. Please login again.');
+      }
+      throw new Error(data.message || 'API request failed');
+    }
+
+    return data;
+  };
+
+  // ============================================================================
+  // Statistics Handlers
+  // ============================================================================
+
+  const fetchStatistics = async (tkn = token) => {
+    try {
+      const headers = {
+        'Authorization': `Bearer ${tkn}`
+      };
+      const response = await fetch(`${API_BASE_URL}/statistics`, { headers });
+      const data = await response.json();
+
+      if (data.success) {
+        setStatistics(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+    }
+  };
+
+  // ============================================================================
+  // Interns Handlers
+  // ============================================================================
+
+  const fetchInterns = async (tkn = token) => {
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/interns`);
+      if (data.success) {
+        setInterns(data.data);
+        setFilteredInterns(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching interns:', error);
+      setInternError('Failed to fetch interns');
+    }
+  };
+
+  const handleAddIntern = async (e) => {
+    e.preventDefault();
+    setInternError('');
+
+    if (!newIntern.name || !newIntern.email || !newIntern.department || !newIntern.joining_date) {
+      setInternError('All fields are required');
+      return;
+    }
+
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/interns`, {
+        method: 'POST',
+        body: JSON.stringify(newIntern)
+      });
+
+      if (data.success) {
+        setInterns([data.data, ...interns]);
+        setFilteredInterns([data.data, ...interns]);
+        setNewIntern({
+          name: '',
+          email: '',
+          department: '',
+          joining_date: ''
+        });
+      }
+    } catch (error) {
+      setInternError(error.message);
+    }
+  };
+
+  const handleUpdateIntern = async (e) => {
+    e.preventDefault();
+    setInternError('');
+
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/interns/${editingIntern.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editingIntern)
+      });
+
+      if (data.success) {
+        const updatedInterns = interns.map(i => i.id === editingIntern.id ? data.data : i);
+        setInterns(updatedInterns);
+        setFilteredInterns(updatedInterns);
+        setEditingIntern(null);
+      }
+    } catch (error) {
+      setInternError(error.message);
     }
   };
 
   const handleDeleteIntern = async (id) => {
-    if (window.confirm('Are you sure you want to delete this intern?')) {
-      setLoading(true);
-      try {
-        const response = await fetch(`${API_BASE_URL}/interns/${id}`, {
-          method: 'DELETE',
-        });
+    if (!window.confirm('Are you sure you want to delete this intern?')) return;
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || 'Failed to delete intern');
-        }
-
-        fetchInterns();
-        fetchTasks();
-        fetchStatistics();
-      } catch (err) {
-        setError(err.message);
-        console.error('Error deleting intern:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  // Task operations
-  const handleAddTask = () => {
-    setEditingTask(null);
-    setTaskFormData({ intern_id: '', title: '', description: '', status: 'pending' });
-    setShowTaskForm(true);
-    setError('');
-  };
-
-  const handleEditTask = (task) => {
-    setEditingTask(task);
-    setTaskFormData(task);
-    setShowTaskForm(true);
-    setError('');
-  };
-
-  const handleSaveTask = async () => {
-    if (!validateTaskForm()) return;
-
-    setLoading(true);
     try {
-      const url = editingTask
-        ? `${API_BASE_URL}/tasks/${editingTask.id}`
-        : `${API_BASE_URL}/tasks`;
-
-      const method = editingTask ? 'PUT' : 'POST';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...taskFormData,
-          intern_id: parseInt(taskFormData.intern_id)
-        }),
+      const data = await fetchWithToken(`${API_BASE_URL}/interns/${id}`, {
+        method: 'DELETE'
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to save task');
+      if (data.success) {
+        const updatedInterns = interns.filter(i => i.id !== id);
+        setInterns(updatedInterns);
+        setFilteredInterns(updatedInterns);
       }
-
-      setShowTaskForm(false);
-      setError('');
-      fetchTasks();
-      fetchStatistics();
-    } catch (err) {
-      setError(err.message);
-      console.error('Error saving task:', err);
-    } finally {
-      setLoading(false);
+    } catch (error) {
+      setInternError(error.message);
     }
   };
 
-  const handleUpdateTaskStatus = async (id, newStatus) => {
+  // ============================================================================
+  // Tasks Handlers
+  // ============================================================================
+
+  const fetchTasks = async (tkn = token) => {
     try {
-      const task = tasks.find(t => t.id === id);
-      const response = await fetch(`${API_BASE_URL}/tasks/${id}`, {
+      const data = await fetchWithToken(`${API_BASE_URL}/tasks`);
+      if (data.success) {
+        setTasks(data.data);
+        setFilteredTasks(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      setTaskError('Failed to fetch tasks');
+    }
+  };
+
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+    setTaskError('');
+
+    if (!newTask.intern_id || !newTask.title || !newTask.description) {
+      setTaskError('All fields are required');
+      return;
+    }
+
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/tasks`, {
+        method: 'POST',
+        body: JSON.stringify({
+          ...newTask,
+          intern_id: parseInt(newTask.intern_id)
+        })
+      });
+
+      if (data.success) {
+        setTasks([data.data, ...tasks]);
+        setFilteredTasks([data.data, ...tasks]);
+        setNewTask({
+          intern_id: '',
+          title: '',
+          description: '',
+          status: 'pending'
+        });
+      }
+    } catch (error) {
+      setTaskError(error.message);
+    }
+  };
+
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+    setTaskError('');
+
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/tasks/${editingTask.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        body: JSON.stringify(editingTask)
+      });
+
+      if (data.success) {
+        const updatedTasks = tasks.map(t => t.id === editingTask.id ? data.data : t);
+        setTasks(updatedTasks);
+        setFilteredTasks(updatedTasks);
+        setEditingTask(null);
+      }
+    } catch (error) {
+      setTaskError(error.message);
+    }
+  };
+
+  const handleUpdateTaskStatus = async (taskId, newStatus) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/tasks/${taskId}`, {
+        method: 'PUT',
         body: JSON.stringify({
           ...task,
           status: newStatus
-        }),
+        })
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update task');
+      if (data.success) {
+        const updatedTasks = tasks.map(t => t.id === taskId ? data.data : t);
+        setTasks(updatedTasks);
+        setFilteredTasks(updatedTasks);
+        fetchStatistics();
       }
-
-      fetchTasks();
-      fetchStatistics();
-    } catch (err) {
-      setError(err.message);
-      console.error('Error updating task:', err);
+    } catch (error) {
+      setTaskError(error.message);
     }
   };
 
-  // Filtering and searching
-  const filteredInterns = interns.filter(intern => {
-    const matchesDepartment = filterDepartment === 'All' || intern.department === filterDepartment;
-    const matchesSearch = intern.name.toLowerCase().includes(searchIntern.toLowerCase());
-    return matchesDepartment && matchesSearch;
-  });
+  const handleDeleteTask = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
 
-  const filteredTasks = tasks.filter(task => {
-    return filterTaskStatus === 'All' || task.status === filterTaskStatus;
-  });
+    try {
+      const data = await fetchWithToken(`${API_BASE_URL}/tasks/${id}`, {
+        method: 'DELETE'
+      });
 
-  // Get department list
-  const departments = ['All', ...new Set(interns.map(i => i.department))];
+      if (data.success) {
+        const updatedTasks = tasks.filter(t => t.id !== id);
+        setTasks(updatedTasks);
+        setFilteredTasks(updatedTasks);
+        fetchStatistics();
+      }
+    } catch (error) {
+      setTaskError(error.message);
+    }
+  };
 
-  // UI Components
-  const StatCard = ({ label, value, icon }) => (
+  // ============================================================================
+  // Filter Functions
+  // ============================================================================
+
+  useEffect(() => {
+    let filtered = interns;
+
+    if (internSearchTerm) {
+      filtered = filtered.filter(i =>
+        i.name.toLowerCase().includes(internSearchTerm.toLowerCase()) ||
+        i.email.toLowerCase().includes(internSearchTerm.toLowerCase())
+      );
+    }
+
+    if (filterDepartment !== 'All') {
+      filtered = filtered.filter(i => i.department === filterDepartment);
+    }
+
+    setFilteredInterns(filtered);
+  }, [internSearchTerm, filterDepartment, interns]);
+
+  useEffect(() => {
+    let filtered = tasks;
+
+    if (taskSearchTerm) {
+      filtered = filtered.filter(t =>
+        t.title.toLowerCase().includes(taskSearchTerm.toLowerCase())
+      );
+    }
+
+    if (filterTaskStatus !== 'All') {
+      filtered = filtered.filter(t => t.status === filterTaskStatus);
+    }
+
+    setFilteredTasks(filtered);
+  }, [taskSearchTerm, filterTaskStatus, tasks]);
+
+  // ============================================================================
+  // Component: StatCard
+  // ============================================================================
+
+  const StatCard = ({ title, value }) => (
     <div style={{
+      padding: '24px',
+      borderRadius: '12px',
+      border: `1px solid ${colors.border}`,
       backgroundColor: colors.surface,
-      border: `2px solid ${colors.border}`,
-      borderRadius: '8px',
-      padding: '20px',
-      marginBottom: '15px',
       textAlign: 'center'
     }}>
-      <div style={{ fontSize: '24px', marginBottom: '10px' }}>{icon}</div>
-      <div style={{ fontSize: '12px', color: colors.textSecondary, marginBottom: '8px' }}>{label}</div>
-      <div style={{ fontSize: '32px', fontWeight: 'bold', color: colors.primary }}>{value}</div>
+      <p style={{
+        margin: '0 0 12px 0',
+        color: colors.textMuted,
+        fontSize: '14px',
+        fontWeight: '500'
+      }}>
+        {title}
+      </p>
+      <h3 style={{
+        margin: 0,
+        color: colors.primary,
+        fontSize: '36px',
+        fontWeight: 'bold'
+      }}>
+        {value}
+      </h3>
     </div>
   );
 
-  const Button = ({ onClick, label, variant = 'primary', disabled = false }) => (
+  // ============================================================================
+  // Component: Button
+  // ============================================================================
+
+  const Button = ({ label, onClick, variant = 'primary', style = {}, disabled = false }) => (
     <button
       onClick={onClick}
       disabled={disabled}
       style={{
-        backgroundColor: variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : colors.success,
-        color: colors.text,
+        padding: '10px 20px',
+        borderRadius: '8px',
         border: 'none',
-        padding: '10px 16px',
-        borderRadius: '6px',
-        cursor: disabled ? 'not-allowed' : 'pointer',
         fontSize: '14px',
-        fontWeight: '500',
-        marginRight: '8px',
-        marginBottom: '8px',
+        fontWeight: '600',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        backgroundColor: variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : colors.success,
+        color: '#fff',
+        transition: 'all 0.3s ease',
         opacity: disabled ? 0.6 : 1,
-        transition: 'background-color 0.3s'
+        ...style
       }}
-      onMouseEnter={(e) => !disabled && (e.target.style.backgroundColor = colors.hover)}
-      onMouseLeave={(e) => (e.target.style.backgroundColor = variant === 'primary' ? colors.primary : variant === 'danger' ? colors.danger : colors.success)}
+      onMouseEnter={(e) => !disabled && (e.target.style.opacity = '0.8')}
+      onMouseLeave={(e) => !disabled && (e.target.style.opacity = '1')}
     >
       {label}
     </button>
   );
 
-  const LoadingIndicator = () => (
+  // ============================================================================
+  // Render: Login Page
+  // ============================================================================
+
+  const LoginPage = () => (
     <div style={{
+      minHeight: '100vh',
+      backgroundColor: colors.background,
       display: 'flex',
-      justifyContent: 'center',
       alignItems: 'center',
-      padding: '30px'
+      justifyContent: 'center',
+      padding: '20px'
     }}>
       <div style={{
-        width: '40px',
-        height: '40px',
-        border: `3px solid ${colors.border}`,
-        borderTop: `3px solid ${colors.primary}`,
-        borderRadius: '50%',
-        animation: 'spin 1s linear infinite'
-      }} />
-    </div>
-  );
-
-  const ErrorMessage = ({ message }) => (
-    <div style={{
-      backgroundColor: 'rgba(239, 68, 68, 0.1)',
-      border: `1px solid ${colors.danger}`,
-      color: colors.danger,
-      padding: '12px 16px',
-      borderRadius: '6px',
-      marginBottom: '16px',
-      fontSize: '14px'
-    }}>
-      {message}
-    </div>
-  );
-
-  // Page components
-  const DashboardPage = () => (
-    <div>
-      <h1 style={{ color: colors.text, marginBottom: '30px', fontSize: '32px', fontWeight: '600' }}>
-        Dashboard
-      </h1>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '40px' }}>
-        <StatCard label="Total Interns" value={statistics.totalInterns} icon="" />
-        <StatCard label="Total Tasks" value={statistics.totalTasks} icon="" />
-        <StatCard label="Completed Tasks" value={statistics.completedTasks} icon="" />
-        <StatCard label="Pending Tasks" value={statistics.pendingTasks} icon="" />
-      </div>
-
-      <div style={{
-        backgroundColor: colors.surface,
-        border: `2px solid ${colors.border}`,
-        borderRadius: '8px',
-        padding: '20px'
+        width: '100%',
+        maxWidth: '400px',
+        padding: '40px',
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        backgroundColor: colors.surface
       }}>
-        <h2 style={{ color: colors.text, marginBottom: '20px', fontSize: '20px' }}>Recent Activity</h2>
-        <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
-          {interns.length === 0 ? (
-            <p style={{ color: colors.textSecondary }}>No interns added yet. Create your first intern to get started.</p>
-          ) : (
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              {interns.slice(-5).reverse().map(intern => (
-                <li key={intern.id} style={{
-                  padding: '12px',
-                  borderBottom: `1px solid ${colors.border}`,
-                  color: colors.textSecondary,
-                  fontSize: '14px'
-                }}>
-                  <strong style={{ color: colors.text }}>{intern.name}</strong> joined as {intern.department} intern
-                </li>
-              ))}
-            </ul>
-          )}
+        <h1 style={{
+          color: colors.primary,
+          textAlign: 'center',
+          marginBottom: '30px',
+          fontSize: '28px'
+        }}>
+          Intern Portal
+        </h1>
+
+        {loginError && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#7f1d1d',
+            color: '#fca5a5',
+            fontSize: '14px'
+          }}>
+            {loginError}
+          </div>
+        )}
+
+        <form onSubmit={handleLogin}>
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: colors.text,
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Username
+            </label>
+            <input
+              type="text"
+              value={loginUsername}
+              onChange={(e) => setLoginUsername(e.target.value)}
+              placeholder="admin"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
+                border: `1px solid ${colors.border}`,
+                backgroundColor: colors.background,
+                color: colors.text,
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '30px' }}>
+            <label style={{
+              display: 'block',
+              marginBottom: '8px',
+              color: colors.text,
+              fontSize: '14px',
+              fontWeight: '500'
+            }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+              placeholder="admin123"
+              style={{
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
+                border: `1px solid ${colors.border}`,
+                backgroundColor: colors.background,
+                color: colors.text,
+                fontSize: '14px',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loginLoading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: colors.primary,
+              color: '#fff',
+              fontSize: '16px',
+              fontWeight: '600',
+              cursor: loginLoading ? 'not-allowed' : 'pointer',
+              opacity: loginLoading ? 0.7 : 1
+            }}
+          >
+            {loginLoading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+
+        <div style={{
+          marginTop: '30px',
+          padding: '20px',
+          borderRadius: '8px',
+          backgroundColor: colors.background,
+          fontSize: '13px',
+          color: colors.textMuted,
+          lineHeight: '1.6'
+        }}>
+          <strong>Demo Credentials:</strong>
+          <br />
+          <br />
+          <strong>Admin:</strong>
+          <br />
+          Username: admin
+          <br />
+          Password: admin123
+          <br />
+          <br />
+          <strong>Manager:</strong>
+          <br />
+          Username: manager
+          <br />
+          Password: manager123
+          <br />
+          <br />
+          <strong>Intern:</strong>
+          <br />
+          Username: intern
+          <br />
+          Password: intern123
         </div>
       </div>
     </div>
   );
 
-  const InternsPage = () => (
+  // ============================================================================
+  // Render: Dashboard Page
+  // ============================================================================
+
+  const DashboardPage = () => (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: colors.text, fontSize: '32px', fontWeight: '600', margin: 0 }}>
-          Interns
-        </h1>
-        <Button onClick={handleAddIntern} label="+ Add Intern" variant="primary" />
+      <h2 style={{ color: colors.text, marginBottom: '30px', fontSize: '28px' }}>Dashboard</h2>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+        gap: '20px',
+        marginBottom: '40px'
+      }}>
+        <StatCard title="Total Interns" value={statistics.totalInterns} />
+        <StatCard title="Total Tasks" value={statistics.totalTasks} />
+        <StatCard title="Completed Tasks" value={statistics.completedTasks} />
+        <StatCard title="Pending Tasks" value={statistics.pendingTasks} />
       </div>
 
-      {error && <ErrorMessage message={error} />}
+      <div style={{
+        padding: '24px',
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        backgroundColor: colors.surface
+      }}>
+        <h3 style={{
+          color: colors.text,
+          marginTop: 0,
+          marginBottom: '20px'
+        }}>
+          Recent Activity
+        </h3>
+        <p style={{ color: colors.textMuted, margin: 0 }}>
+          {interns.length === 0
+            ? 'No interns added yet. Create your first intern to get started.'
+            : `You have ${interns.length} interns and ${tasks.length} tasks.`}
+        </p>
+      </div>
+    </div>
+  );
 
-      {showInternForm && (
-        <div style={{
+  // ============================================================================
+  // Render: Interns Page
+  // ============================================================================
+
+  const InternsPage = () => (
+    <div>
+      <div style={{ marginBottom: '30px' }}>
+        <h2 style={{ color: colors.text, margin: '0 0 20px 0' }}>Manage Interns</h2>
+
+        {internError && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#7f1d1d',
+            color: '#fca5a5',
+            fontSize: '14px'
+          }}>
+            {internError}
+          </div>
+        )}
+
+        <form onSubmit={editingIntern ? handleUpdateIntern : handleAddIntern} style={{
+          padding: '24px',
+          borderRadius: '12px',
+          border: `1px solid ${colors.border}`,
           backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '20px',
           marginBottom: '30px'
         }}>
-          <h2 style={{ color: colors.text, marginBottom: '20px' }}>
+          <h3 style={{ color: colors.text, marginTop: 0, marginBottom: '20px' }}>
             {editingIntern ? 'Edit Intern' : 'Add New Intern'}
-          </h2>
+          </h3>
 
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Name *
-            </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
             <input
               type="text"
-              value={internFormData.name}
-              onChange={(e) => setInternFormData({ ...internFormData, name: e.target.value })}
+              placeholder="Name"
+              value={editingIntern ? editingIntern.name : newIntern.name}
+              onChange={(e) => editingIntern
+                ? setEditingIntern({ ...editingIntern, name: e.target.value })
+                : setNewIntern({ ...newIntern, name: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
-              placeholder="Enter intern name"
             />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Email *
-            </label>
             <input
               type="email"
-              value={internFormData.email}
-              onChange={(e) => setInternFormData({ ...internFormData, email: e.target.value })}
+              placeholder="Email"
+              value={editingIntern ? editingIntern.email : newIntern.email}
+              onChange={(e) => editingIntern
+                ? setEditingIntern({ ...editingIntern, email: e.target.value })
+                : setNewIntern({ ...newIntern, email: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
-              placeholder="Enter email address"
             />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Department *
-            </label>
             <select
-              value={internFormData.department}
-              onChange={(e) => setInternFormData({ ...internFormData, department: e.target.value })}
+              value={editingIntern ? editingIntern.department : newIntern.department}
+              onChange={(e) => editingIntern
+                ? setEditingIntern({ ...editingIntern, department: e.target.value })
+                : setNewIntern({ ...newIntern, department: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
             >
               <option value="">Select Department</option>
               <option value="Engineering">Engineering</option>
               <option value="Marketing">Marketing</option>
-              <option value="HR">HR</option>
               <option value="Sales">Sales</option>
+              <option value="HR">HR</option>
               <option value="Design">Design</option>
+              <option value="Finance">Finance</option>
             </select>
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Joining Date *
-            </label>
             <input
               type="date"
-              value={internFormData.joining_date}
-              onChange={(e) => setInternFormData({ ...internFormData, joining_date: e.target.value })}
+              value={editingIntern ? editingIntern.joining_date : newIntern.joining_date}
+              onChange={(e) => editingIntern
+                ? setEditingIntern({ ...editingIntern, joining_date: e.target.value })
+                : setNewIntern({ ...newIntern, joining_date: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
             />
           </div>
 
-          <div>
-            <Button onClick={handleSaveIntern} label={loading ? "Saving..." : "Save Intern"} variant="primary" disabled={loading} />
+          <div style={{ display: 'flex', gap: '10px' }}>
             <button
-              onClick={() => setShowInternForm(false)}
+              type="submit"
               style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
-                border: `1px solid ${colors.border}`,
-                padding: '10px 16px',
-                borderRadius: '6px',
+                padding: '12px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: colors.primary,
+                color: '#fff',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
+                fontWeight: '600'
               }}
             >
-              Cancel
+              {editingIntern ? 'Update Intern' : 'Add Intern'}
             </button>
+            {editingIntern && (
+              <button
+                type="button"
+                onClick={() => setEditingIntern(null)}
+                style={{
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                Cancel
+              </button>
+            )}
           </div>
-        </div>
-      )}
-
-      {loading && <LoadingIndicator />}
+        </form>
+      </div>
 
       <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-        gap: '20px',
-        marginBottom: '30px'
+        padding: '24px',
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        backgroundColor: colors.surface
       }}>
-        <div style={{
-          backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '12px'
-        }}>
-          <label style={{ color: colors.text, fontWeight: '500', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-            Filter by Department
-          </label>
+        <h3 style={{ color: colors.text, marginTop: 0, marginBottom: '20px' }}>Interns List</h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+          <input
+            type="text"
+            placeholder="Search by name or email..."
+            value={internSearchTerm}
+            onChange={(e) => setInternSearchTerm(e.target.value)}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              border: `1px solid ${colors.border}`,
+              backgroundColor: colors.background,
+              color: colors.text
+            }}
+          />
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
             style={{
-              width: '100%',
-              padding: '10px 12px',
-              backgroundColor: colors.background,
+              padding: '12px',
+              borderRadius: '8px',
               border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              color: colors.text,
-              fontSize: '14px',
-              boxSizing: 'border-box'
+              backgroundColor: colors.background,
+              color: colors.text
             }}
           >
-            {departments.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
+            <option value="All">All Departments</option>
+            <option value="Engineering">Engineering</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Sales">Sales</option>
+            <option value="HR">HR</option>
+            <option value="Design">Design</option>
+            <option value="Finance">Finance</option>
           </select>
         </div>
 
-        <div style={{
-          backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '12px'
-        }}>
-          <label style={{ color: colors.text, fontWeight: '500', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-            Search by Name
-          </label>
-          <input
-            type="text"
-            value={searchIntern}
-            onChange={(e) => setSearchIntern(e.target.value)}
-            placeholder="Enter intern name"
-            style={{
+        {filteredInterns.length === 0 ? (
+          <p style={{ color: colors.textMuted, textAlign: 'center', padding: '20px' }}>
+            No interns found.
+          </p>
+        ) : (
+          <div style={{
+            overflowX: 'auto'
+          }}>
+            <table style={{
               width: '100%',
-              padding: '10px 12px',
-              backgroundColor: colors.background,
-              border: `1px solid ${colors.border}`,
-              borderRadius: '6px',
-              color: colors.text,
-              fontSize: '14px',
-              boxSizing: 'border-box'
-            }}
-          />
-        </div>
+              borderCollapse: 'collapse'
+            }}>
+              <thead>
+                <tr style={{ borderBottom: `1px solid ${colors.border}` }}>
+                  <th style={{ padding: '12px', textAlign: 'left', color: colors.textMuted, fontWeight: '600' }}>Name</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: colors.textMuted, fontWeight: '600' }}>Email</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: colors.textMuted, fontWeight: '600' }}>Department</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: colors.textMuted, fontWeight: '600' }}>Joining Date</th>
+                  <th style={{ padding: '12px', textAlign: 'left', color: colors.textMuted, fontWeight: '600' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredInterns.map((intern) => (
+                  <tr key={intern.id} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                    <td style={{ padding: '12px', color: colors.text }}>{intern.name}</td>
+                    <td style={{ padding: '12px', color: colors.text }}>{intern.email}</td>
+                    <td style={{ padding: '12px', color: colors.text }}>{intern.department}</td>
+                    <td style={{ padding: '12px', color: colors.text }}>{new Date(intern.joining_date).toLocaleDateString()}</td>
+                    <td style={{ padding: '12px' }}>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                          onClick={() => setEditingIntern(intern)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: colors.primary,
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteIntern(intern.id)}
+                          style={{
+                            padding: '6px 12px',
+                            borderRadius: '6px',
+                            border: 'none',
+                            backgroundColor: colors.danger,
+                            color: '#fff',
+                            cursor: 'pointer',
+                            fontSize: '12px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-
-      {filteredInterns.length === 0 ? (
-        <div style={{
-          backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '40px',
-          textAlign: 'center',
-          color: colors.textSecondary
-        }}>
-          No interns found
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: '20px'
-        }}>
-          {filteredInterns.map(intern => (
-            <div key={intern.id} style={{
-              backgroundColor: colors.surface,
-              border: `2px solid ${colors.border}`,
-              borderRadius: '8px',
-              padding: '20px',
-              transition: 'all 0.3s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = colors.primary;
-              e.currentTarget.style.boxShadow = `0 0 20px rgba(30, 64, 175, 0.2)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = colors.border;
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-            >
-              <h3 style={{ color: colors.text, marginTop: 0, marginBottom: '12px', fontSize: '18px' }}>
-                {intern.name}
-              </h3>
-              <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '8px 0' }}>
-                <strong style={{ color: colors.text }}>Email:</strong> {intern.email}
-              </p>
-              <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '8px 0' }}>
-                <strong style={{ color: colors.text }}>Department:</strong> {intern.department}
-              </p>
-              <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '8px 0' }}>
-                <strong style={{ color: colors.text }}>Joined:</strong> {new Date(intern.joining_date).toLocaleDateString()}
-              </p>
-              <div style={{ marginTop: '16px' }}>
-                <Button onClick={() => handleEditIntern(intern)} label="Edit" variant="primary" />
-                <Button onClick={() => handleDeleteIntern(intern.id)} label="Delete" variant="danger" />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 
+  // ============================================================================
+  // Render: Tasks Page
+  // ============================================================================
+
   const TasksPage = () => (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
-        <h1 style={{ color: colors.text, fontSize: '32px', fontWeight: '600', margin: 0 }}>
-          Tasks
-        </h1>
-        <Button onClick={handleAddTask} label="+ Add Task" variant="primary" />
-      </div>
+      <div style={{ marginBottom: '30px' }}>
+        <h2 style={{ color: colors.text, margin: '0 0 20px 0' }}>Manage Tasks</h2>
 
-      {error && <ErrorMessage message={error} />}
+        {taskError && (
+          <div style={{
+            padding: '12px',
+            marginBottom: '20px',
+            borderRadius: '8px',
+            backgroundColor: '#7f1d1d',
+            color: '#fca5a5',
+            fontSize: '14px'
+          }}>
+            {taskError}
+          </div>
+        )}
 
-      {showTaskForm && (
-        <div style={{
+        <form onSubmit={editingTask ? handleUpdateTask : handleAddTask} style={{
+          padding: '24px',
+          borderRadius: '12px',
+          border: `1px solid ${colors.border}`,
           backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '20px',
           marginBottom: '30px'
         }}>
-          <h2 style={{ color: colors.text, marginBottom: '20px' }}>
+          <h3 style={{ color: colors.text, marginTop: 0, marginBottom: '20px' }}>
             {editingTask ? 'Edit Task' : 'Create New Task'}
-          </h2>
+          </h3>
 
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Select Intern *
-            </label>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px', marginBottom: '20px' }}>
             <select
-              value={taskFormData.intern_id}
-              onChange={(e) => setTaskFormData({ ...taskFormData, intern_id: e.target.value })}
+              value={editingTask ? editingTask.intern_id : newTask.intern_id}
+              onChange={(e) => editingTask
+                ? setEditingTask({ ...editingTask, intern_id: parseInt(e.target.value) })
+                : setNewTask({ ...newTask, intern_id: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
             >
-              <option value="">Choose an intern</option>
+              <option value="">Select Intern</option>
               {interns.map(intern => (
-                <option key={intern.id} value={intern.id}>
-                  {intern.name} ({intern.department})
-                </option>
+                <option key={intern.id} value={intern.id}>{intern.name}</option>
               ))}
             </select>
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Task Title *
-            </label>
             <input
               type="text"
-              value={taskFormData.title}
-              onChange={(e) => setTaskFormData({ ...taskFormData, title: e.target.value })}
+              placeholder="Task Title"
+              value={editingTask ? editingTask.title : newTask.title}
+              onChange={(e) => editingTask
+                ? setEditingTask({ ...editingTask, title: e.target.value })
+                : setNewTask({ ...newTask, title: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
-              }}
-              placeholder="Enter task title"
-            />
-          </div>
-
-          <div style={{ marginBottom: '16px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Description *
-            </label>
-            <textarea
-              value={taskFormData.description}
-              onChange={(e) => setTaskFormData({ ...taskFormData, description: e.target.value })}
-              style={{
-                width: '100%',
-                padding: '10px 12px',
                 backgroundColor: colors.background,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box',
-                minHeight: '100px',
-                fontFamily: 'inherit'
+                color: colors.text
               }}
-              placeholder="Enter task description"
             />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: colors.text, marginBottom: '6px', fontWeight: '500', fontSize: '14px' }}>
-              Status
-            </label>
             <select
-              value={taskFormData.status}
-              onChange={(e) => setTaskFormData({ ...taskFormData, status: e.target.value })}
+              value={editingTask ? editingTask.status : newTask.status}
+              onChange={(e) => editingTask
+                ? setEditingTask({ ...editingTask, status: e.target.value })
+                : setNewTask({ ...newTask, status: e.target.value })
+              }
               style={{
-                width: '100%',
-                padding: '10px 12px',
-                backgroundColor: colors.background,
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                borderRadius: '6px',
-                color: colors.text,
-                fontSize: '14px',
-                boxSizing: 'border-box'
+                backgroundColor: colors.background,
+                color: colors.text
               }}
             >
               <option value="pending">Pending</option>
@@ -814,227 +1071,303 @@ const InternManagementPortal = () => {
             </select>
           </div>
 
-          <div>
-            <Button onClick={handleSaveTask} label={loading ? "Saving..." : "Save Task"} variant="primary" disabled={loading} />
-            <button
-              onClick={() => setShowTaskForm(false)}
+          <div style={{ marginBottom: '20px' }}>
+            <textarea
+              placeholder="Task Description"
+              value={editingTask ? editingTask.description : newTask.description}
+              onChange={(e) => editingTask
+                ? setEditingTask({ ...editingTask, description: e.target.value })
+                : setNewTask({ ...newTask, description: e.target.value })
+              }
+              rows={3}
               style={{
-                backgroundColor: colors.surface,
-                color: colors.text,
+                width: '100%',
+                padding: '12px',
+                borderRadius: '8px',
                 border: `1px solid ${colors.border}`,
-                padding: '10px 16px',
-                borderRadius: '6px',
+                backgroundColor: colors.background,
+                color: colors.text,
+                boxSizing: 'border-box',
+                fontFamily: 'inherit'
+              }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="submit"
+              style={{
+                padding: '12px 20px',
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: colors.primary,
+                color: '#fff',
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500'
+                fontWeight: '600'
               }}
             >
-              Cancel
+              {editingTask ? 'Update Task' : 'Create Task'}
             </button>
+            {editingTask && (
+              <button
+                type="button"
+                onClick={() => setEditingTask(null)}
+                style={{
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: colors.surface,
+                  color: colors.text,
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  border: `1px solid ${colors.border}`
+                }}
+              >
+                Cancel
+              </button>
+            )}
           </div>
-        </div>
-      )}
-
-      {loading && <LoadingIndicator />}
-
-      <div style={{
-        backgroundColor: colors.surface,
-        border: `2px solid ${colors.border}`,
-        borderRadius: '8px',
-        padding: '12px',
-        marginBottom: '30px'
-      }}>
-        <label style={{ color: colors.text, fontWeight: '500', fontSize: '14px', marginBottom: '8px', display: 'block' }}>
-          Filter by Status
-        </label>
-        <select
-          value={filterTaskStatus}
-          onChange={(e) => setFilterTaskStatus(e.target.value)}
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            backgroundColor: colors.background,
-            border: `1px solid ${colors.border}`,
-            borderRadius: '6px',
-            color: colors.text,
-            fontSize: '14px',
-            boxSizing: 'border-box'
-          }}
-        >
-          <option value="All">All</option>
-          <option value="pending">Pending</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-        </select>
+        </form>
       </div>
 
-      {filteredTasks.length === 0 ? (
-        <div style={{
-          backgroundColor: colors.surface,
-          border: `2px solid ${colors.border}`,
-          borderRadius: '8px',
-          padding: '40px',
-          textAlign: 'center',
-          color: colors.textSecondary
-        }}>
-          No tasks found
-        </div>
-      ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: '20px'
-        }}>
-          {filteredTasks.map(task => {
-            const intern = interns.find(i => i.id === task.intern_id);
-            const statusColors = {
-              pending: colors.warning,
-              in_progress: colors.primary,
-              completed: colors.success
-            };
+      <div style={{
+        padding: '24px',
+        borderRadius: '12px',
+        border: `1px solid ${colors.border}`,
+        backgroundColor: colors.surface
+      }}>
+        <h3 style={{ color: colors.text, marginTop: 0, marginBottom: '20px' }}>Tasks List</h3>
 
-            return (
-              <div key={task.id} style={{
-                backgroundColor: colors.surface,
-                border: `2px solid ${colors.border}`,
-                borderRadius: '8px',
-                padding: '20px',
-                transition: 'all 0.3s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = colors.primary;
-                e.currentTarget.style.boxShadow = `0 0 20px rgba(30, 64, 175, 0.2)`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = colors.border;
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                  <h3 style={{ color: colors.text, margin: 0, fontSize: '18px' }}>
-                    {task.title}
-                  </h3>
-                  <span style={{
-                    backgroundColor: statusColors[task.status],
-                    color: colors.text,
-                    padding: '4px 12px',
-                    borderRadius: '12px',
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '15px', marginBottom: '20px' }}>
+          <input
+            type="text"
+            placeholder="Search tasks..."
+            value={taskSearchTerm}
+            onChange={(e) => setTaskSearchTerm(e.target.value)}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              border: `1px solid ${colors.border}`,
+              backgroundColor: colors.background,
+              color: colors.text
+            }}
+          />
+          <select
+            value={filterTaskStatus}
+            onChange={(e) => setFilterTaskStatus(e.target.value)}
+            style={{
+              padding: '12px',
+              borderRadius: '8px',
+              border: `1px solid ${colors.border}`,
+              backgroundColor: colors.background,
+              color: colors.text
+            }}
+          >
+            <option value="All">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+
+        {filteredTasks.length === 0 ? (
+          <p style={{ color: colors.textMuted, textAlign: 'center', padding: '20px' }}>
+            No tasks found.
+          </p>
+        ) : (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: '20px'
+          }}>
+            {filteredTasks.map(task => {
+              const intern = interns.find(i => i.id === task.intern_id);
+              return (
+                <div
+                  key={task.id}
+                  style={{
+                    padding: '20px',
+                    borderRadius: '8px',
+                    border: `1px solid ${colors.border}`,
+                    backgroundColor: colors.background
+                  }}
+                >
+                  <div style={{ marginBottom: '12px' }}>
+                    <h4 style={{ color: colors.primary, margin: '0 0 8px 0', fontSize: '16px' }}>
+                      {task.title}
+                    </h4>
+                    <p style={{ color: colors.textMuted, margin: 0, fontSize: '13px' }}>
+                      {intern ? intern.name : 'Unknown Intern'}
+                    </p>
+                  </div>
+
+                  <p style={{ color: colors.text, margin: '12px 0', fontSize: '14px' }}>
+                    {task.description}
+                  </p>
+
+                  <div style={{
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    backgroundColor: task.status === 'completed' ? '#064e3b' : task.status === 'in_progress' ? '#1e3a8a' : '#3f3f46',
+                    color: task.status === 'completed' ? '#86efac' : task.status === 'in_progress' ? '#93c5fd' : '#a1a1aa',
                     fontSize: '12px',
                     fontWeight: '600',
-                    textTransform: 'capitalize'
+                    marginBottom: '12px',
+                    textAlign: 'center'
                   }}>
-                    {task.status.replace('_', ' ')}
-                  </span>
-                </div>
+                    {task.status.replace('_', ' ').toUpperCase()}
+                  </div>
 
-                <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '8px 0' }}>
-                  <strong style={{ color: colors.text }}>Assigned to:</strong> {intern ? intern.name : 'Unknown'}
-                </p>
-                <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '8px 0' }}>
-                  <strong style={{ color: colors.text }}>Description:</strong> {task.description}
-                </p>
-                <p style={{ color: colors.textSecondary, fontSize: '13px', margin: '12px 0' }}>
-                  <strong style={{ color: colors.text }}>Created:</strong> {new Date(task.created_at).toLocaleDateString()}
-                </p>
-
-                <div style={{ marginTop: '16px' }}>
-                  {task.status !== 'completed' && (
-                    <Button 
-                      onClick={() => handleUpdateTaskStatus(task.id, task.status === 'pending' ? 'in_progress' : 'completed')} 
-                      label={task.status === 'pending' ? 'Start Task' : 'Mark Complete'} 
-                      variant="success" 
-                    />
-                  )}
-                  <Button onClick={() => handleEditTask(task)} label="Edit" variant="primary" />
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {task.status !== 'completed' && (
+                      <button
+                        onClick={() => handleUpdateTaskStatus(task.id, task.status === 'pending' ? 'in_progress' : 'completed')}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          backgroundColor: colors.success,
+                          color: '#fff',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {task.status === 'pending' ? 'Start Task' : 'Mark Complete'}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setEditingTask(task)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: colors.primary,
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: 'none',
+                        backgroundColor: colors.danger,
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '600'
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 
-  // Main render
+  // ============================================================================
+  // Main Render
+  // ============================================================================
+
+  if (!isLoggedIn) {
+    return <LoginPage />;
+  }
+
   return (
     <div style={{
-      backgroundColor: colors.background,
-      color: colors.text,
       minHeight: '100vh',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+      backgroundColor: colors.background,
+      color: colors.text
     }}>
-      <style>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-        input:focus, textarea:focus, select:focus {
-          outline: none;
-          border-color: ${colors.primary} !important;
-          box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1) !important;
-        }
-      `}</style>
-
-      {/* Navigation Bar */}
-      <nav style={{
-        backgroundColor: colors.secondary,
-        borderBottom: `2px solid ${colors.border}`,
-        padding: '0 24px',
-        position: 'sticky',
-        top: 0,
-        zIndex: 100
+      {/* Header */}
+      <header style={{
+        padding: '20px 40px',
+        backgroundColor: colors.surface,
+        borderBottom: `1px solid ${colors.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+        <h1 style={{
+          margin: 0,
+          color: colors.primary,
+          fontSize: '24px'
         }}>
-          <h1 style={{ fontSize: '24px', fontWeight: '700', color: colors.primary, margin: 0 }}>
-            Intern Portal
-          </h1>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            {['dashboard', 'interns', 'tasks'].map(page => (
-              <button
-                key={page}
-                onClick={() => {
-                  setCurrentPage(page);
-                  setShowInternForm(false);
-                  setShowTaskForm(false);
-                  setError('');
-                }}
-                style={{
-                  backgroundColor: currentPage === page ? colors.primary : 'transparent',
-                  color: colors.text,
-                  border: 'none',
-                  padding: '12px 20px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  borderRadius: '6px',
-                  transition: 'all 0.3s',
-                  textTransform: 'capitalize'
-                }}
-                onMouseEnter={(e) => currentPage !== page && (e.target.style.backgroundColor = colors.surface)}
-                onMouseLeave={(e) => currentPage !== page && (e.target.style.backgroundColor = 'transparent')}
-              >
-                {page}
-              </button>
-            ))}
+          Intern Portal
+        </h1>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ fontSize: '14px', color: colors.textMuted }}>
+            Welcome, <strong>{currentUser?.name}</strong> ({currentUser?.role})
           </div>
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: colors.danger,
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '14px'
+            }}
+          >
+            Logout
+          </button>
         </div>
+      </header>
+
+      {/* Navigation */}
+      <nav style={{
+        padding: '20px 40px',
+        backgroundColor: colors.background,
+        borderBottom: `1px solid ${colors.border}`,
+        display: 'flex',
+        gap: '20px'
+      }}>
+        {['dashboard', 'interns', 'tasks'].map(page => (
+          <button
+            key={page}
+            onClick={() => setCurrentPage(page)}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: 'none',
+              backgroundColor: currentPage === page ? colors.primary : 'transparent',
+              color: colors.text,
+              cursor: 'pointer',
+              fontWeight: '600',
+              fontSize: '14px',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => currentPage !== page && (e.target.style.backgroundColor = colors.surface)}
+            onMouseLeave={(e) => currentPage !== page && (e.target.style.backgroundColor = 'transparent')}
+          >
+            {page.charAt(0).toUpperCase() + page.slice(1)}
+          </button>
+        ))}
       </nav>
 
-      {/* Main Content */}
+      {/* Content */}
       <main style={{
-        maxWidth: '1200px',
-        margin: '0 auto',
-        padding: '32px 24px'
+        padding: '40px',
+        maxWidth: '1400px',
+        margin: '0 auto'
       }}>
         {currentPage === 'dashboard' && <DashboardPage />}
         {currentPage === 'interns' && <InternsPage />}
