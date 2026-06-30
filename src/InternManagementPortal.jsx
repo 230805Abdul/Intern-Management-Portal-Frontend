@@ -1,7 +1,7 @@
 // InternManagementPortal-FINAL-FIXED.jsx
 // COMPLETE FIX: Input focus issue + Dashboard redirect working
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
@@ -138,31 +138,6 @@ const SelectInput = ({ value, onChange, children }) => (
   </select>
 );
 
-const Button = ({ label, onClick, disabled = false, variant = 'primary' }) => {
-  const bg = variant === 'danger' ? colors.danger
-    : variant === 'success' ? colors.success
-    : colors.primary;
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="ip-btn"
-      style={{
-        padding: '10px 20px',
-        borderRadius: '10px',
-        border: 'none',
-        backgroundColor: bg,
-        color: '#fff',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        fontWeight: '600',
-        opacity: disabled ? 0.6 : 1,
-        boxShadow: `0 1px 2px rgba(15, 23, 42, 0.08)`
-      }}
-    >
-      {label}
-    </button>
-  );
-};
 
 // Shared top header bar — used by Dashboard / Interns / Tasks / Attendance pages
 const PageHeader = ({ currentUser, onLogout }) => (
@@ -306,29 +281,10 @@ const InternManagementPortal = () => {
   }, []);
 
   // ============================================================================
-  // CHECK IF ALREADY LOGGED IN
-  // ============================================================================
-
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setCurrentUser(JSON.parse(savedUser));
-      setIsLoggedIn(true);
-      setCurrentPage('dashboard');
-      
-      // Fetch data
-      loadData(savedToken);
-    }
-  }, []);
-
-  // ============================================================================
   // LOAD DATA (INTERNS, TASKS, STATISTICS)
   // ============================================================================
 
-  const loadData = async (tkn = token) => {
+  const loadData = useCallback(async (tkn = token) => {
     try {
       // Load statistics
       const statsRes = await fetch(`${API_URL}/statistics`, {
@@ -368,7 +324,26 @@ const InternManagementPortal = () => {
     } catch (error) {
       console.error('Error loading data:', error);
     }
-  };
+  }, [token, API_URL]);
+
+  // ============================================================================
+  // CHECK IF ALREADY LOGGED IN
+  // ============================================================================
+
+  useEffect(() => {
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setCurrentUser(JSON.parse(savedUser));
+      setIsLoggedIn(true);
+      setCurrentPage('dashboard');
+
+      // Fetch data
+      loadData(savedToken);
+    }
+  }, [loadData]);
 
   // ============================================================================
   // LOGIN HANDLER
